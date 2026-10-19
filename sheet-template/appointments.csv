@@ -1,0 +1,2 @@
+appt_id,patient_name,phone,service,start_time,value_usd,status,r48_sent,filled_by,r24_sent
+APPT-1,Demo Patient,+1XXXXXXXXXX,cleaning,2026-10-20T15:00:00-07:00,180,booked,,,

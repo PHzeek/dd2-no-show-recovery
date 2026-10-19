@@ -1,0 +1,2587 @@
+{
+  "name": "DD2 No-Show Recovery",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dd2-reply",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        128
+      ],
+      "id": "6d85357e-c99d-4c4e-9fb4-404174360c4e",
+      "name": "Webhook",
+      "webhookId": "f2e0c9c2-da8a-4788-9f84-4dacccf994d6"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<Response></Response>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -576,
+        128
+      ],
+      "id": "ba7b106e-0c65-4c97-9782-f0a75e8d45c9",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -800,
+        -480
+      ],
+      "id": "8bcb5537-dca3-4eb9-8ba3-f75670e0eb66",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -576,
+        -480
+      ],
+      "id": "d9bcf97f-7f8b-4c8d-9073-ff2bc676d273",
+      "name": "Get appts"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $json.phone }}",
+        "toWhatsapp": true,
+        "message": "=Hi {{ $json.patient_name }}, reminder: your {{ $json.service }} is in about {{ $json.hours }} hours. Reply C to confirm or X to cancel.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        -480
+      ],
+      "id": "c9b6ebfe-62e9-4567-8c66-3692fc6c9d3e",
+      "name": "Send reminder",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Date.now();                       // current time in milliseconds\nconst out = [];\nfor (const item of $input.all()) {            // every row from Get appts\n  const a = item.json;\n  if (a.status !== 'booked') continue;        // confirmed or cancelled: skip\n  const hours = (new Date(a.start_time).getTime() - now) / 36e5;   // blank 1: which column holds the appointment time?\n  let which = null;\n  if (hours > 24 && hours <= 48 && !a.r48_sent) which = 'r48';\n  else if (hours > 0 && hours <= 24 && !a.r24_sent) which = 'r24';\n  if (which) out.push({ json: { ...a, which, hours: Math.round(hours) } });  // blank 2: what should we round?\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -480
+      ],
+      "id": "ca752bfd-b88c-4d9e-bed5-eb8d6e1f2442",
+      "name": "Due reminders"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "appt_id": "={{ $('Due reminders').item.json.appt_id }}",
+            "r48_sent": "={{ $('Due reminders').item.json.which === 'r48' ? $now.toISO() : $('Due reminders').item.json.r48_sent }}",
+            "r24_sent": "={{ $('Due reminders').item.json.which === 'r24' ? $now.toISO() : $('Due reminders').item.json.r24_sent }}"
+          },
+          "matchingColumns": [
+            "appt_id"
+          ],
+          "schema": [
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "r48_sent",
+              "displayName": "r48_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filled_by",
+              "displayName": "filled_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "r24_sent",
+              "displayName": "r24_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        96,
+        -480
+      ],
+      "id": "012b1713-250d-43a1-83ea-591f3a62008b",
+      "name": "Mark sent"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{ $now.toISO() }}",
+            "event": "={{ 'reminder_' + $('Due reminders').item.json.which }}",
+            "appt_id": "={{ $('Due reminders').item.json.appt_id }}",
+            "phone": "={{ $('Due reminders').item.json.phone }}",
+            "detail": "={{ $('Send reminder').item.json.sid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        320,
+        -480
+      ],
+      "id": "8d244e67-9384-4c9d-bca1-4fa039d2ba26",
+      "name": "Log reminder"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body;                                   // Twilio's message fields\nconst phone = b.From.replace('whatsapp:', '');          // \"whatsapp:+1...\" -> \"+1...\"\nlet text = b.Body.trim().toUpperCase();                 // blank: remove spaces at both ends\ntext = text.replace(/[.!]+$/, '');                      // \"C.\" -> \"C\"\nconst RULES = { CONFIRM: ['C', 'CONFIRM'], CANCEL: ['X', 'CANCEL'], TAKE: ['YES', 'Y'] };\nlet intent = 'UNCLEAR';                                 // default: a human looks at it\nfor (const [name, words] of Object.entries(RULES)) {\n  if (words.includes(text)) intent = name;\n}\nreturn { json: { phone, text, raw: b.Body, intent } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        128
+      ],
+      "id": "df057f99-8b0a-43bd-a856-ef804b3226bf",
+      "name": "Normalize"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "CONFIRM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "977e453e-a945-4f13-b489-88d4a760755f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CONFIRM"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "457d1026-540c-43eb-a8bc-0f67eb493881",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "CANCEL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CANCEL"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8ebf1f4c-8d01-45f5-b031-8ae3389c4dd1",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "TAKE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "TAKE"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        96
+      ],
+      "id": "ac2c17ff-277a-47f3-aa18-46ab98802781",
+      "name": "Route reply"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $json.phone }}"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "booked"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        96,
+        -256
+      ],
+      "id": "dca95bb5-fa3b-455b-b882-e6c104fc6323",
+      "name": "Confirm: find"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "appt_id": "={{ $json.appt_id }}",
+            "status": "confirmed"
+          },
+          "matchingColumns": [
+            "appt_id"
+          ],
+          "schema": [
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "r48_sent",
+              "displayName": "r48_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "filled_by",
+              "displayName": "filled_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        320,
+        -256
+      ],
+      "id": "4400dbf9-1154-4b8a-9bc7-771b9c7bf8f3",
+      "name": "Confirm: update"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $('Confirm: find').item.json.phone }}",
+        "toWhatsapp": true,
+        "message": "Thanks, you're confirmed. See you then.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -256
+      ],
+      "id": "402aded8-c8a6-4a3f-8728-d8ef3128cc16",
+      "name": "Confirm: reply",
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{ $now.toISO() }}",
+            "event": "confirmed",
+            "appt_id": "={{ $('Confirm: find').item.json.appt_id }}",
+            "phone": "={{ $('Confirm: find').item.json.phone }}",
+            "detail": "={{ $('Confirm: reply').item.json.sid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        -256
+      ],
+      "id": "ae6410ee-048d-42e8-a1f4-098fe5d19a7b",
+      "name": "Confirm: log"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $json.phone }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        96,
+        -64
+      ],
+      "id": "002313c2-0b78-465a-9cd2-09bdab309b6c",
+      "name": "Cancel: find"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3ed07ce1-e359-4b67-9d49-4f697d088698",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "booked",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "3561733f-ce52-454d-a536-7dff24faad1a",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "confirmed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        -64
+      ],
+      "id": "abddf734-8d51-4b5a-9ab1-8aa94911ea6c",
+      "name": "Cancel: active?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "appt_id": "={{ $json.appt_id }}",
+            "status": "cancelled"
+          },
+          "matchingColumns": [
+            "appt_id"
+          ],
+          "schema": [
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "r48_sent",
+              "displayName": "r48_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "filled_by",
+              "displayName": "filled_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        544,
+        -64
+      ],
+      "id": "b48e158b-f7d7-4fce-aa48-75aa80e02602",
+      "name": "Cancel: update"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $('Cancel: find').item.json.phone }}",
+        "toWhatsapp": true,
+        "message": "Your appointment is cancelled. Reply anytime to rebook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        768,
+        -64
+      ],
+      "id": "e30558ba-1e57-489e-bac7-26fc67678211",
+      "name": "Cancel: reply",
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{ $now.toISO() }}",
+            "event": "cancelled",
+            "appt_id": "={{ $('Cancel: find').item.json.appt_id }}",
+            "phone": "={{ $('Cancel: find').item.json.phone }}",
+            "detail": "={{ $('Cancel: reply').item.json.sid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        992,
+        -64
+      ],
+      "id": "e71452df-af54-478c-a27e-e398a991c81e",
+      "name": "Cancel: log"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "waitlist"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "service",
+              "lookupValue": "={{ $('Cancel: find').first().json.service }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        -64
+      ],
+      "id": "1aee5e1b-2b2f-4e0f-ac55-6e70971ded30",
+      "name": "Offer: waitlist"
+    },
+    {
+      "parameters": {
+        "jsCode": "const appt = $('Cancel: find').first().json;               // the slot that just opened\nconst waiting = $input.all()\n  .map(i => i.json)\n  .filter(w => w.status === 'waiting')                        // blank 1: who is eligible?\n  .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));   // earliest sign-up first\nreturn waiting.slice(0, 3).map(w => ({ json: {          // blank 2: how many offers at once?\n  ...w,\n  appt_id: appt.appt_id,\n  service: appt.service,\n  start_time: appt.start_time\n} }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -64
+      ],
+      "id": "43f7dc22-3160-414e-a743-caa5abac56aa",
+      "name": "Pick up to 3"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "waitlist"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "wait_id": "={{ $json.wait_id }}",
+            "status": "offered",
+            "offered_appt_id": "={{ $json.appt_id }}"
+          },
+          "matchingColumns": [
+            "wait_id"
+          ],
+          "schema": [
+            {
+              "id": "wait_id",
+              "displayName": "wait_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "offered_appt_id",
+              "displayName": "offered_appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "joined_at",
+              "displayName": "joined_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1664,
+        -64
+      ],
+      "id": "77d1d73b-e01c-4780-8c52-3e0f0e9682b7",
+      "name": "Offer: mark"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $('Pick up to 3').item.json.phone }}",
+        "toWhatsapp": true,
+        "message": "=Good news: a {{ $('Pick up to 3').item.json.service }} spot opened on {{ DateTime.fromISO($('Pick up to 3').item.json.start_time, { setZone: true }).toFormat('ccc LLL d, h:mm a') }}. Reply YES to take it. First reply gets it.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1888,
+        -64
+      ],
+      "id": "38b56cba-65df-4b90-a28b-31c7048cb5b8",
+      "name": "Offer: send",
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{ $now.toISO() }}",
+            "event": "offered",
+            "appt_id": "={{ $('Pick up to 3').item.json.appt_id }}",
+            "phone": "={{ $('Pick up to 3').item.json.phone }}",
+            "detail": "={{ $('Pick up to 3').item.json.wait_id + ' ' + $('Offer: send').item.json.sid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2112,
+        -64
+      ],
+      "id": "01f10a71-d7ae-4487-b2d1-ccf9bc193ea7",
+      "name": "Offer: log"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "waitlist"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $json.phone }}"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "offered"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        96,
+        224
+      ],
+      "id": "6a0221b9-ff41-498c-aee2-6f7e74908a15",
+      "name": "Take: wait"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "appt_id",
+              "lookupValue": "={{ $json.offered_appt_id }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        320,
+        224
+      ],
+      "id": "ca1c78aa-8215-4541-8fc5-5b219293be08",
+      "name": "Take: appt"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2a4d0625-9ee6-414e-bb52-f8ced933b92a",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "cancelled",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        544,
+        224
+      ],
+      "id": "4fe4c246-bcb4-4741-b092-12df7894fa5a",
+      "name": "Still open?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "appt_id": "={{ $json.appt_id }}",
+            "status": "filled",
+            "filled_by": "={{ $('Take: wait').item.json.phone }}"
+          },
+          "matchingColumns": [
+            "appt_id"
+          ],
+          "schema": [
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "r48_sent",
+              "displayName": "r48_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "filled_by",
+              "displayName": "filled_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        128
+      ],
+      "id": "15f11b2d-6a9f-40ee-9edf-bda85d19eef1",
+      "name": "Claim: appt"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "waitlist"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "wait_id": "={{ $('Take: wait').item.json.wait_id }}",
+            "status": "booked"
+          },
+          "matchingColumns": [
+            "wait_id"
+          ],
+          "schema": [
+            {
+              "id": "wait_id",
+              "displayName": "wait_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "offered_appt_id",
+              "displayName": "offered_appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "joined_at",
+              "displayName": "joined_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        992,
+        128
+      ],
+      "id": "773cb986-fd86-435e-9def-0aa53546c90c",
+      "name": "Claim: wait"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $('Take: wait').item.json.phone }}",
+        "toWhatsapp": true,
+        "message": "=You're booked for {{ DateTime.fromISO($('Take: appt').item.json.start_time, { setZone: true }).toFormat('ccc LLL d, h:mm a') }}. See you then.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        128
+      ],
+      "id": "e405c78b-fbf7-4762-bcc0-060dda73b8ea",
+      "name": "Claim: reply",
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{ $now.toISO() }}",
+            "event": "recovered",
+            "appt_id": "={{ $('Take: appt').item.json.appt_id }}",
+            "phone": "={{ $('Take: wait').item.json.phone }}",
+            "detail": "={{ $('Take: wait').item.json.wait_id + ' ' + $('Claim: reply').item.json.sid }}",
+            "value_usd": "={{ $('Take: appt').item.json.value_usd }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1440,
+        128
+      ],
+      "id": "1b04cac6-68c6-4503-bb08-b3caa9ffbd93",
+      "name": "Claim: log"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "waitlist"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "wait_id": "={{ $('Take: wait').item.json.wait_id }}",
+            "status": "waiting",
+            "offered_appt_id": "none"
+          },
+          "matchingColumns": [
+            "wait_id"
+          ],
+          "schema": [
+            {
+              "id": "wait_id",
+              "displayName": "wait_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "offered_appt_id",
+              "displayName": "offered_appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "joined_at",
+              "displayName": "joined_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        320
+      ],
+      "id": "f3bc6b37-a31e-439e-a29b-b29ed63bcddf",
+      "name": "Lost: wait"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $('Take: wait').item.json.phone }}",
+        "toWhatsapp": true,
+        "message": "Sorry, that spot was just taken. You're still on the list.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        992,
+        320
+      ],
+      "id": "07e7dd37-a597-46cb-ab0e-67a7611fb3d5",
+      "name": "Lost: reply"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "={{ $json.phone }}",
+        "toWhatsapp": true,
+        "message": "Thanks, got your message. Someone from the office will reply shortly.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        96,
+        416
+      ],
+      "id": "a6d41c86-985e-4ccc-ba58-de0ba1554e79",
+      "name": "Unclear: hold"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "+1XXXXXXXXXX",
+        "toWhatsapp": true,
+        "message": "=Needs a human: \"{{ $('Normalize').item.json.raw }}\" from {{ $('Normalize').item.json.phone }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        320,
+        416
+      ],
+      "id": "d2e5de49-a0c3-4d51-9610-ead17f9a308b",
+      "name": "Unclear: alert"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{ $now.toISO() }}",
+            "event": "needs_human",
+            "phone": "={{ $('Normalize').item.json.phone }}",
+            "detail": "={{ $('Normalize').item.json.raw }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        544,
+        416
+      ],
+      "id": "e455c10b-3b10-4c1b-879e-880a7f288814",
+      "name": "Unclear: log"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event": "offer_lost",
+            "ts": "={{ $now.toISO() }}",
+            "appt_id": "={{ $('Take: appt').item.json.appt_id }}",
+            "phone": "={{ $('Take: wait').item.json.phone }}",
+            "detail": "={{ $('Take: wait').item.json.wait_id + ' ' + $('Lost: reply').item.json.sid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appt_id",
+              "displayName": "appt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value_usd",
+              "displayName": "value_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        320
+      ],
+      "id": "8290669d-edb7-41ca-b8d6-1912aae227a9",
+      "name": "Lost: log"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get appts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get appts": {
+      "main": [
+        [
+          {
+            "node": "Due reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Due reminders": {
+      "main": [
+        [
+          {
+            "node": "Send reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark sent": {
+      "main": [
+        [
+          {
+            "node": "Log reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Route reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route reply": {
+      "main": [
+        [
+          {
+            "node": "Confirm: find",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel: find",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Take: wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unclear: hold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm: find": {
+      "main": [
+        [
+          {
+            "node": "Confirm: update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm: update": {
+      "main": [
+        [
+          {
+            "node": "Confirm: reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm: reply": {
+      "main": [
+        [
+          {
+            "node": "Confirm: log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: find": {
+      "main": [
+        [
+          {
+            "node": "Cancel: active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: active?": {
+      "main": [
+        [
+          {
+            "node": "Cancel: update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: update": {
+      "main": [
+        [
+          {
+            "node": "Cancel: reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: reply": {
+      "main": [
+        [
+          {
+            "node": "Cancel: log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: log": {
+      "main": [
+        [
+          {
+            "node": "Offer: waitlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offer: waitlist": {
+      "main": [
+        [
+          {
+            "node": "Pick up to 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick up to 3": {
+      "main": [
+        [
+          {
+            "node": "Offer: mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offer: mark": {
+      "main": [
+        [
+          {
+            "node": "Offer: send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offer: send": {
+      "main": [
+        [
+          {
+            "node": "Offer: log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take: wait": {
+      "main": [
+        [
+          {
+            "node": "Take: appt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take: appt": {
+      "main": [
+        [
+          {
+            "node": "Still open?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still open?": {
+      "main": [
+        [
+          {
+            "node": "Claim: appt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lost: wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim: appt": {
+      "main": [
+        [
+          {
+            "node": "Claim: wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim: wait": {
+      "main": [
+        [
+          {
+            "node": "Claim: reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim: reply": {
+      "main": [
+        [
+          {
+            "node": "Claim: log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lost: wait": {
+      "main": [
+        [
+          {
+            "node": "Lost: reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lost: reply": {
+      "main": [
+        [
+          {
+            "node": "Lost: log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unclear: hold": {
+      "main": [
+        [
+          {
+            "node": "Unclear: alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unclear: alert": {
+      "main": [
+        [
+          {
+            "node": "Unclear: log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

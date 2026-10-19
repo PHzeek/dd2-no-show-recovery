@@ -1,0 +1,3 @@
+wait_id,name,phone,service,status,offered_appt_id,joined_at
+WAIT-1,Waitlist A,+1XXXXXXXXXX,cleaning,waiting,,2026-10-01
+WAIT-2,Waitlist B,+1XXXXXXXXXX,cleaning,waiting,,2026-10-02

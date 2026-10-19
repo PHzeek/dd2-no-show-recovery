@@ -1,0 +1,3 @@
+Slots recovered,"=COUNTIF(log!B:B,""recovered"")"
+Revenue recovered,"=SUMIF(log!B:B,""recovered"",log!F:F)"
+Sent to a human,"=COUNTIF(log!B:B,""needs_human"")"
